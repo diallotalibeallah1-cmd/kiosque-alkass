@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kiosque Alkass</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="brand"><span>K</span><div><h1>Kiosque Alkass</h1><p id="authSubtitle">Connexion utilisateur</p></div></div>
+
+    <form id="loginForm" class="form">
+      <input id="loginEmail" type="email" placeholder="Email" required />
+      <input id="loginPass" type="password" placeholder="Mot de passe" required />
+      <p class="error hidden" id="loginError"></p>
+      <button type="submit">Se connecter</button>
+      <a href="#" id="showRegister">Créer un compte</a>
+    </form>
+
+    <form id="registerForm" class="form hidden">
+      <input id="registerEmail" type="email" placeholder="Email" required />
+      <input id="registerPass" type="password" placeholder="Mot de passe (6 caractères min.)" required />
+      <p class="error hidden" id="registerError"></p>
+      <button type="submit">Créer mon compte</button>
+      <a href="#" id="showLogin">J'ai déjà un compte</a>
+    </form>
+  </div>
+</div>
+
+<div class="app hidden" id="app">
+  <aside class="sidebar">
+    <div class="brand side"><span>K</span><div><h1>Kiosque Alkass</h1><p>Tableau de bord</p></div></div>
+    <nav>
+      <a class="active" href="#">Dashboard</a>
+      <a href="#">Vendu</a>
+      <a href="#">Dépenses</a>
+      <a href="#">Réinvestis</a>
+      <a href="#">Travail du jour</a>
+      <a href="#">Stock</a>
+      <a href="#">Rapports</a>
+    </nav>
+    <button class="logout" id="logoutBtn">Se déconnecter</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2>Bonjour, bienvenue sur Kiosque Alkass</h2>
+        <p>Suivi des ventes, dépenses, réinvestissements et activité du jour.</p>
+      </div>
+      <div class="userpill" id="userPill">Utilisateur connecté</div>
+    </header>
+
+    <section class="kpis">
+      <article class="card yellow"><span>Vendu</span><strong id="kpiVendu">0 FCFA</strong><small id="kpiVenduSmall">Aucune vente enregistrée</small></article>
+      <article class="card brown"><span>Dépenses</span><strong id="kpiDepenses">0 FCFA</strong><small>Stock, transport, frais</small></article>
+      <article class="card dark"><span>Réinvestis</span><strong id="kpiReinvestis">0 FCFA</strong><small>Nouvelle marchandise</small></article>
+      <article class="card light"><span>Bénéfice</span><strong id="kpiBenefice">0 FCFA</strong><small>Net après dépenses</small></article>
+    </section>
+
+    <section class="grid2">
+      <article class="panel">
+        <div class="panel-head"><h3>Travail du jour</h3><span class="tag">En cours</span></div>
+        <table>
+          <thead><tr><th>Date</th><th>Compte rendu</th><th>Montant</th><th></th></tr></thead>
+          <tbody id="reportsTableBody">
+            <tr class="empty-row"><td colspan="4">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>Répartition</h3><span class="tag">Cumulée</span></div>
+        <div class="bars">
+          <div><div class="row"><strong>Vendu</strong><span id="barVenduVal">0</span></div><div class="bar"><span class="w0" id="barVendu"></span></div></div>
+          <div><div class="row"><strong>Dépenses</strong><span id="barDepensesVal">0</span></div><div class="bar"><span class="w0 red" id="barDepenses"></span></div></div>
+          <div><div class="row"><strong>Réinvestis</strong><span id="barReinvestisVal">0</span></div><div class="bar"><span class="w0 green" id="barReinvestis"></span></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid2">
+      <article class="panel">
+        <div class="panel-head"><h3>Ajouter un compte rendu</h3><span class="tag">Rapport</span></div>
+        <form class="report-form" id="reportForm">
+          <input id="repDate" placeholder="Date" type="date" required />
+          <input id="repVendu" placeholder="Vendu (FCFA)" type="number" min="0" />
+          <input id="repDepenses" placeholder="Dépenses (FCFA)" type="number" min="0" />
+          <input id="repReinvestis" placeholder="Réinvestis (FCFA)" type="number" min="0" />
+          <textarea id="repNote" placeholder="Écris ici le compte rendu du travail, les ventes, les dépenses et les remarques."></textarea>
+          <button type="submit">Enregistrer</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><h3>Stock rapide</h3><span class="tag">Modifiable</span></div>
+        <div class="stock-list" id="stockList">
+          <p class="hint">Chargement du stock…</p>
+        </div>
+        <p class="hint">Clique sur une valeur pour la modifier, puis sors du champ pour l'enregistrer.</p>
+      </article>
+    </section>
+  </main>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
