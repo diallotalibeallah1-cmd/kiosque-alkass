@@ -1,17 +1,48 @@
 # Kiosque Alkass
 
-Tableau de bord de gestion pour kiosque : ventes, dépenses, réinvestissements et stock, avec de vrais comptes utilisateurs et des données sauvegardées côté serveur.
+Tableau de bord de gestion pour kiosque : ventes, dépenses, réinvestissements, graphiques, objectifs et rappels par email.
 
-## Ce qui est inclus
+## Nouveautés de cette version
 
-- **Backend** : Node.js + Express
-- **Comptes utilisateurs** : inscription / connexion avec mot de passe chiffré (bcrypt), session sécurisée par cookie
-- **Base de données** : fichier local `data/db.json` (aucune base externe à installer)
-- **Frontend** : les 3 fichiers `index.html` / `styles.css` / `script.js`, connectés au backend via des appels API
+- **Mot de passe oublié** : email avec lien de réinitialisation
+- **Graphiques** : évolution jour / semaine / mois (Chart.js)
+- **Analyse** : meilleur jour et jour le plus difficile
+- **Objectifs** : fixer un montant à atteindre par semaine ou par mois, avec barre de progression
+- **Page Compte** : voir son email, changer son mot de passe (le mot de passe lui-même n'est jamais réaffiché — il est chiffré, c'est normal et plus sûr)
+- **Rappels par email** façon Duolingo, si aucun compte rendu n'a été ajouté dans la journée
+- Le stock a été retiré au profit de l'onglet Analyse
 
-## Installation (sur ton ordinateur)
+## Variables d'environnement à configurer sur Render
 
-Il te faut [Node.js](https://nodejs.org) installé (version 18 ou plus récente).
+En plus de `SESSION_SECRET` (déjà en place), ajoute ces variables dans Render (Dashboard → ton service → Environment) :
+
+| Variable | Valeur |
+|---|---|
+| `GMAIL_USER` | ton adresse Gmail complète, ex: `talibe@gmail.com` |
+| `GMAIL_APP_PASSWORD` | un "mot de passe d'application" Gmail (voir ci-dessous) |
+| `CRON_SECRET` | une phrase secrète de ton choix, pour protéger l'envoi des rappels |
+| `APP_URL` | l'adresse de ton site, ex: `https://kiosque-alkass.onrender.com` |
+
+### Comment obtenir un "mot de passe d'application" Gmail
+
+1. Va sur **myaccount.google.com/security**
+2. Active la **validation en 2 étapes** si ce n'est pas déjà fait (obligatoire pour l'étape suivante)
+3. Cherche **"Mots de passe des applications"** (ou va directement sur **myaccount.google.com/apppasswords**)
+4. Crée un nouveau mot de passe d'application (nom libre, ex: "Kiosque Alkass")
+5. Google te donne un code à 16 caractères — c'est ça qu'il faut mettre dans `GMAIL_APP_PASSWORD` (pas ton mot de passe Gmail habituel)
+
+## Activer les rappels quotidiens automatiques
+
+Le serveur expose une route `/api/cron/send-reminders` qui envoie un rappel à tous les utilisateurs n'ayant pas encore ajouté de compte rendu aujourd'hui. Comme le plan gratuit de Render met le site en veille, il faut un service externe gratuit pour "réveiller" cette route une fois par jour :
+
+1. Crée un compte gratuit sur **cron-job.org**
+2. Crée un nouveau cron job :
+   - URL : `https://TON-SITE.onrender.com/api/cron/send-reminders`
+   - Méthode : **POST**
+   - En-tête (header) : `x-cron-secret` = la même valeur que ta variable `CRON_SECRET`
+   - Fréquence : une fois par jour (ex: 18h00)
+
+## Installation locale
 
 ```bash
 cd kiosque-alkass
@@ -19,37 +50,19 @@ npm install
 npm start
 ```
 
-Le site est alors accessible sur : **http://localhost:3000**
-
-## Mettre le site en ligne
-
-Ce projet peut être déployé tel quel sur un hébergeur qui supporte Node.js, par exemple :
-
-- **Railway** ou **Render** (gratuit pour démarrer, très simple : connecter le dossier/GitHub et déployer)
-- Un VPS (OVH, Contabo...) avec Node.js installé
-
-Avant la mise en ligne, pense à :
-
-1. Définir une variable d'environnement `SESSION_SECRET` avec une valeur longue et aléatoire (sert à sécuriser les sessions de connexion).
-2. Si l'hébergeur impose un port, il est déjà géré automatiquement via `process.env.PORT`.
+Le site est alors accessible sur **http://localhost:3000**. En local, sans les variables `GMAIL_USER`/`GMAIL_APP_PASSWORD`, les emails ne partent pas mais le reste du site fonctionne normalement (un message s'affiche dans le terminal à la place).
 
 ## Structure du projet
 
 ```
 kiosque-alkass/
-  server.js         → le serveur (routes API, sessions)
+  server.js         → serveur (routes API, sessions, cron)
   db.js             → lecture/écriture des données (data/db.json)
-  data/db.json       → la base de données (créée automatiquement au premier lancement)
+  mail.js           → envoi des emails (Gmail)
+  data/db.json      → base de données (créée automatiquement)
   public/
-    index.html      → la page (connexion + tableau de bord)
-    styles.css      → le design
-    script.js       → les appels au backend (fetch)
+    index.html      → application (connexion + tableau de bord)
+    reset.html      → page de réinitialisation du mot de passe
+    styles.css      → design
+    script.js       → logique du tableau de bord
 ```
-
-## Limites actuelles à connaître
-
-- La base de données est un simple fichier JSON : parfait pour un ou quelques kiosques avec un usage modéré, mais pas conçu pour un très grand volume de données simultanées.
-- Il n'y a pas encore de récupération de mot de passe oublié ni de vérification d'email.
-- Chaque utilisateur ne voit que ses propres comptes rendus et son propre stock.
-
-Si le kiosque grandit et que tu as besoin de plus de robustesse (beaucoup d'utilisateurs, plusieurs kiosques, statistiques avancées), on pourra migrer `data/db.json` vers une vraie base de données (PostgreSQL par exemple) sans changer le reste de l'application.

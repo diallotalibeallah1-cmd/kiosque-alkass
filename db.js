@@ -1,8 +1,5 @@
 // db.js
 // Base de données simple basée sur un fichier JSON (data/db.json).
-// Suffisant pour un kiosque avec quelques utilisateurs et un usage modéré.
-// Pour un usage à plus grande échelle, on pourrait migrer vers PostgreSQL/MySQL
-// en gardant les mêmes fonctions exportées ci-dessous.
 
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +12,7 @@ function ensureDb() {
     fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   }
   if (!fs.existsSync(DB_PATH)) {
-    const initial = { users: [], reports: [], stock: [] };
+    const initial = { users: [], reports: [], goals: [] };
     fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2));
   }
 }
@@ -23,7 +20,9 @@ function ensureDb() {
 function readDb() {
   ensureDb();
   const raw = fs.readFileSync(DB_PATH, 'utf-8');
-  return JSON.parse(raw);
+  const data = JSON.parse(raw);
+  if (!data.goals) data.goals = [];
+  return data;
 }
 
 function writeDb(data) {
@@ -41,6 +40,11 @@ function findUserByEmail(email) {
   return db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 }
 
+function findUserById(userId) {
+  const db = readDb();
+  return db.users.find((u) => u.id === userId);
+}
+
 function createUser({ email, passwordHash }) {
   const db = readDb();
   const user = {
@@ -48,18 +52,61 @@ function createUser({ email, passwordHash }) {
     email,
     passwordHash,
     createdAt: new Date().toISOString(),
+    resetToken: null,
+    resetTokenExpiry: null,
+    lastReminderSentDate: null,
   };
   db.users.push(user);
-
-  // Stock par défaut pour un nouveau compte
-  db.stock.push(
-    { userId: user.id, key: 'boissons', label: 'Boissons', value: '0 unité' },
-    { userId: user.id, key: 'biscuits', label: 'Biscuits', value: '0 unité' },
-    { userId: user.id, key: 'divers', label: 'Produits divers', value: '0 unité' }
-  );
-
   writeDb(db);
   return user;
+}
+
+function updateUserPassword(userId, passwordHash) {
+  const db = readDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return null;
+  user.passwordHash = passwordHash;
+  writeDb(db);
+  return user;
+}
+
+function setResetToken(userId, token, expiry) {
+  const db = readDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return null;
+  user.resetToken = token;
+  user.resetTokenExpiry = expiry;
+  writeDb(db);
+  return user;
+}
+
+function findUserByResetToken(token) {
+  const db = readDb();
+  return db.users.find((u) => u.resetToken === token);
+}
+
+function clearResetToken(userId) {
+  const db = readDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return null;
+  user.resetToken = null;
+  user.resetTokenExpiry = null;
+  writeDb(db);
+  return user;
+}
+
+function setLastReminderSentDate(userId, dateStr) {
+  const db = readDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (!user) return null;
+  user.lastReminderSentDate = dateStr;
+  writeDb(db);
+  return user;
+}
+
+function getAllUsers() {
+  const db = readDb();
+  return db.users;
 }
 
 // ---------- Comptes rendus / rapports ----------
@@ -96,32 +143,41 @@ function deleteReport(userId, reportId) {
   return db.reports.length < before;
 }
 
-// ---------- Stock ----------
+// ---------- Objectifs ----------
 
-function getStockByUser(userId) {
+function getGoal(userId) {
   const db = readDb();
-  return db.stock.filter((s) => s.userId === userId);
+  return db.goals.find((g) => g.userId === userId) || null;
 }
 
-function updateStockItem(userId, key, value) {
+function setGoal(userId, { period, amount }) {
   const db = readDb();
-  let item = db.stock.find((s) => s.userId === userId && s.key === key);
-  if (!item) {
-    item = { userId, key, label: key, value };
-    db.stock.push(item);
+  let goal = db.goals.find((g) => g.userId === userId);
+  if (!goal) {
+    goal = { userId, period, amount: Number(amount) || 0, setAt: new Date().toISOString() };
+    db.goals.push(goal);
   } else {
-    item.value = value;
+    goal.period = period;
+    goal.amount = Number(amount) || 0;
+    goal.setAt = new Date().toISOString();
   }
   writeDb(db);
-  return item;
+  return goal;
 }
 
 module.exports = {
   findUserByEmail,
+  findUserById,
   createUser,
+  updateUserPassword,
+  setResetToken,
+  findUserByResetToken,
+  clearResetToken,
+  setLastReminderSentDate,
+  getAllUsers,
   getReportsByUser,
   addReport,
   deleteReport,
-  getStockByUser,
-  updateStockItem,
+  getGoal,
+  setGoal,
 };
