@@ -37,16 +37,24 @@
       <button type="submit">Envoyer le lien</button>
       <a href="#" id="showLoginFromForgot">Retour à la connexion</a>
     </form>
+
+    <div class="auth-footer">
+      <a href="/privacy.html" target="_blank">Confidentialité</a>
+      <a href="/terms.html" target="_blank">Conditions</a>
+      <a href="/contact.html" target="_blank">Contact</a>
+    </div>
   </div>
 </div>
 
 <div class="app hidden" id="app">
-  <aside class="sidebar">
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+  <aside class="sidebar" id="sidebar">
     <div class="brand side"><span>K</span><div><h1>Kiosque Alkass</h1><p>Tableau de bord</p></div></div>
     <nav>
       <a class="active" data-section="dashboard" href="#">Dashboard</a>
       <a data-section="analyse" href="#">Analyse</a>
       <a data-section="objectifs" href="#">Objectifs</a>
+      <a data-section="historique" href="#">Historique</a>
       <a data-section="compte" href="#">Compte</a>
     </nav>
     <button class="logout" id="logoutBtn">Se déconnecter</button>
@@ -54,12 +62,15 @@
 
   <main class="main">
     <header class="topbar">
+      <button class="burger-btn" id="burgerBtn" aria-label="Menu">☰</button>
       <div>
         <h2>Bonjour, bienvenue sur Kiosque Alkass</h2>
         <p>Suivi des ventes, dépenses, réinvestissements et activité du jour.</p>
       </div>
       <div class="userpill" id="userPill">Utilisateur connecté</div>
     </header>
+
+    <div class="global-loader hidden" id="globalLoader"><span class="spinner"></span> Chargement…</div>
 
     <!-- SECTION DASHBOARD -->
     <section class="view" id="view-dashboard">
@@ -69,6 +80,14 @@
         <article class="card dark"><span>Réinvestis</span><strong id="kpiReinvestis">0 FCFA</strong><small>Nouvelle marchandise</small></article>
         <article class="card light"><span>Bénéfice</span><strong id="kpiBenefice">0 FCFA</strong><small>Net après dépenses</small></article>
       </section>
+
+      <article class="panel export-panel">
+        <div class="panel-head"><h3>Exporter mes données</h3><span class="tag">Rapports</span></div>
+        <div class="export-actions">
+          <a href="/api/export/excel" class="export-btn">📊 Télécharger en Excel</a>
+          <a href="/api/export/pdf" class="export-btn">📄 Télécharger en PDF</a>
+        </div>
+      </article>
 
       <section class="grid2">
         <article class="panel">
@@ -143,6 +162,19 @@
       </article>
     </section>
 
+    <!-- SECTION HISTORIQUE -->
+    <section class="view hidden" id="view-historique">
+      <article class="panel">
+        <div class="panel-head"><h3>Historique des actions</h3><span class="tag">100 dernières</span></div>
+        <table>
+          <thead><tr><th>Date</th><th>Action</th><th>Détail</th></tr></thead>
+          <tbody id="historyTableBody">
+            <tr class="empty-row"><td colspan="3">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
     <!-- SECTION COMPTE -->
     <section class="view hidden" id="view-compte">
       <article class="panel">
@@ -165,6 +197,12 @@
         </form>
       </article>
     </section>
+
+    <footer class="app-footer">
+      <a href="/privacy.html" target="_blank">Confidentialité</a>
+      <a href="/terms.html" target="_blank">Conditions d'utilisation</a>
+      <a href="/contact.html" target="_blank">Contact</a>
+    </footer>
   </main>
 </div>
 <script src="script.js"></script>

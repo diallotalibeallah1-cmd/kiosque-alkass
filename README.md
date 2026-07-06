@@ -2,6 +2,15 @@
 
 Tableau de bord de gestion pour kiosque : ventes, dépenses, réinvestissements, graphiques, objectifs et rappels par email.
 
+## Nouveautés Phase 1 (sécurité, export, mobile)
+
+- **Limite de tentatives de connexion** : après 8 essais en 15 minutes, il faut attendre (protection contre les attaques par mot de passe)
+- **Menu mobile** : bouton ☰ pour ouvrir/fermer la navigation sur téléphone
+- **Export Excel et PDF** de tous les comptes rendus (bouton dans le Dashboard)
+- **Historique des actions** : nouvel onglet listant les 100 dernières actions (comptes rendus ajoutés/supprimés, mot de passe changé, objectifs fixés)
+- **Pages légales** : Confidentialité, Conditions d'utilisation, Contact (liens en bas de page)
+- **Indicateur de chargement** au démarrage de l'application
+
 ## Nouveautés de cette version
 
 - **Mot de passe oublié** : email avec lien de réinitialisation

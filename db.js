@@ -22,6 +22,7 @@ function readDb() {
   const raw = fs.readFileSync(DB_PATH, 'utf-8');
   const data = JSON.parse(raw);
   if (!data.goals) data.goals = [];
+  if (!data.history) data.history = [];
   return data;
 }
 
@@ -165,6 +166,34 @@ function setGoal(userId, { period, amount }) {
   return goal;
 }
 
+// ---------- Historique (audit log) ----------
+
+function addHistory(userId, action, detail) {
+  const db = readDb();
+  db.history.push({
+    id: newId(),
+    userId,
+    action,
+    detail: detail || '',
+    date: new Date().toISOString(),
+  });
+  // On garde seulement les 300 dernières entrées par utilisateur pour ne pas grossir sans fin.
+  const mine = db.history.filter((h) => h.userId === userId);
+  if (mine.length > 300) {
+    const idsToKeep = new Set(mine.slice(mine.length - 300).map((h) => h.id));
+    db.history = db.history.filter((h) => h.userId !== userId || idsToKeep.has(h.id));
+  }
+  writeDb(db);
+}
+
+function getHistory(userId) {
+  const db = readDb();
+  return db.history
+    .filter((h) => h.userId === userId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 100);
+}
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -180,4 +209,6 @@ module.exports = {
   deleteReport,
   getGoal,
   setGoal,
+  addHistory,
+  getHistory,
 };

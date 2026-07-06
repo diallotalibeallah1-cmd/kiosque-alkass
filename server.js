@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
 const db = require('./db');
 const mail = require('./mail');
 
@@ -25,6 +28,15 @@ app.use(
   })
 );
 
+// Limite les tentatives de connexion/inscription pour se protéger des attaques par force brute.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 8,
+  message: { error: 'Trop de tentatives. Réessaie dans quelques minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 function requireAuth(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Non connecté.' });
@@ -38,7 +50,7 @@ function getBaseUrl(req) {
 
 // ---------- Authentification ----------
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'Email et mot de passe requis.' });
@@ -52,12 +64,13 @@ app.post('/api/register', async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = db.createUser({ email, passwordHash });
+  db.addHistory(user.id, 'Compte créé', email);
   req.session.userId = user.id;
   req.session.email = user.email;
   res.json({ id: user.id, email: user.email });
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'Email et mot de passe requis.' });
@@ -93,7 +106,7 @@ app.get('/api/me', (req, res) => {
 
 // ---------- Mot de passe oublié ----------
 
-app.post('/api/forgot-password', async (req, res) => {
+app.post('/api/forgot-password', authLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email requis.' });
 
@@ -126,6 +139,7 @@ app.post('/api/reset-password', async (req, res) => {
   const passwordHash = await bcrypt.hash(newPassword, 10);
   db.updateUserPassword(user.id, passwordHash);
   db.clearResetToken(user.id);
+  db.addHistory(user.id, 'Mot de passe réinitialisé', 'Via lien email');
   res.json({ ok: true });
 });
 
@@ -146,6 +160,7 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   db.updateUserPassword(user.id, passwordHash);
+  db.addHistory(user.id, 'Mot de passe changé', 'Depuis la page Compte');
   res.json({ ok: true });
 });
 
@@ -161,13 +176,19 @@ app.post('/api/reports', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'La date est requise.' });
   }
   const report = db.addReport(req.session.userId, { date, vendu, depenses, reinvestis, note });
+  db.addHistory(req.session.userId, 'Compte rendu ajouté', `${date} — Vendu: ${vendu} FCFA`);
   res.json(report);
 });
 
 app.delete('/api/reports/:id', requireAuth, (req, res) => {
   const ok = db.deleteReport(req.session.userId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Compte rendu introuvable.' });
+  db.addHistory(req.session.userId, 'Compte rendu supprimé', req.params.id);
   res.json({ ok: true });
+});
+
+app.get('/api/history', requireAuth, (req, res) => {
+  res.json(db.getHistory(req.session.userId));
 });
 
 // ---------- Tableau de bord (totaux agrégés) ----------
@@ -257,7 +278,82 @@ app.post('/api/goals', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Période (weekly/monthly) et montant requis.' });
   }
   const goal = db.setGoal(req.session.userId, { period, amount });
+  db.addHistory(req.session.userId, 'Objectif fixé', `${period} — ${amount} FCFA`);
   res.json(goal);
+});
+
+// ---------- Export Excel / PDF ----------
+
+app.get('/api/export/excel', requireAuth, async (req, res) => {
+  const reports = db.getReportsByUser(req.session.userId).slice().reverse();
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Comptes rendus');
+  sheet.columns = [
+    { header: 'Date', key: 'date', width: 14 },
+    { header: 'Vendu (FCFA)', key: 'vendu', width: 16 },
+    { header: 'Dépenses (FCFA)', key: 'depenses', width: 16 },
+    { header: 'Réinvestis (FCFA)', key: 'reinvestis', width: 18 },
+    { header: 'Bénéfice (FCFA)', key: 'benefice', width: 16 },
+    { header: 'Note', key: 'note', width: 40 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+
+  reports.forEach((r) => {
+    sheet.addRow({
+      date: r.date,
+      vendu: r.vendu,
+      depenses: r.depenses,
+      reinvestis: r.reinvestis,
+      benefice: r.vendu - r.depenses - r.reinvestis,
+      note: r.note,
+    });
+  });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="kiosque-alkass-rapports.xlsx"');
+  await workbook.xlsx.write(res);
+  res.end();
+});
+
+app.get('/api/export/pdf', requireAuth, (req, res) => {
+  const reports = db.getReportsByUser(req.session.userId).slice().reverse();
+  const totalVendu = reports.reduce((sum, r) => sum + r.vendu, 0);
+  const totalDepenses = reports.reduce((sum, r) => sum + r.depenses, 0);
+  const totalReinvestis = reports.reduce((sum, r) => sum + r.reinvestis, 0);
+  const benefice = totalVendu - totalDepenses - totalReinvestis;
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="kiosque-alkass-rapport.pdf"');
+
+  const doc = new PDFDocument({ margin: 40 });
+  doc.pipe(res);
+
+  doc.fontSize(20).text('Kiosque Alkass — Rapport', { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(10).fillColor('#666').text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
+  doc.moveDown(2);
+
+  doc.fillColor('#000').fontSize(13).text('Résumé global');
+  doc.fontSize(11);
+  doc.text(`Total vendu : ${totalVendu.toLocaleString('fr-FR')} FCFA`);
+  doc.text(`Total dépenses : ${totalDepenses.toLocaleString('fr-FR')} FCFA`);
+  doc.text(`Total réinvestis : ${totalReinvestis.toLocaleString('fr-FR')} FCFA`);
+  doc.text(`Bénéfice net : ${benefice.toLocaleString('fr-FR')} FCFA`);
+  doc.moveDown(2);
+
+  doc.fontSize(13).text('Détail des comptes rendus');
+  doc.moveDown(0.5);
+  doc.fontSize(9);
+
+  reports.forEach((r) => {
+    const m = r.vendu - r.depenses - r.reinvestis;
+    doc.text(
+      `${r.date}  —  Vendu: ${r.vendu.toLocaleString('fr-FR')} FCFA  |  Dépenses: ${r.depenses.toLocaleString('fr-FR')}  |  Réinvestis: ${r.reinvestis.toLocaleString('fr-FR')}  |  Net: ${m.toLocaleString('fr-FR')} FCFA${r.note ? '  —  ' + r.note : ''}`
+    );
+  });
+
+  doc.end();
 });
 
 // ---------- Rappels par email (appelé par un service de cron externe) ----------

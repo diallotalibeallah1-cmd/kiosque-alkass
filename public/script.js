@@ -124,14 +124,37 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   registerForm.reset();
 });
 
-function enterApp(user) {
+async function enterApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('userPill').textContent = user.email;
   document.getElementById('accountEmail').textContent = user.email;
-  renderDashboard();
-  loadAnalytics('day');
-  loadGoal();
+
+  showLoader();
+  try {
+    await Promise.all([renderDashboard(), loadAnalytics('day'), loadGoal()]);
+  } finally {
+    hideLoader();
+  }
+}
+
+async function loadHistory() {
+  const tbody = document.getElementById('historyTableBody');
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Chargement…</td></tr>';
+  const history = await api('/api/history');
+
+  if (history.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">Aucune action enregistrée pour l\'instant.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  history.forEach((h) => {
+    const tr = document.createElement('tr');
+    const dateStr = new Date(h.date).toLocaleString('fr-FR');
+    tr.innerHTML = `<td>${dateStr}</td><td>${h.action}</td><td>${h.detail}</td>`;
+    tbody.appendChild(tr);
+  });
 }
 
 // ---- Navigation entre sections ----
@@ -143,8 +166,34 @@ document.querySelectorAll('.sidebar nav a').forEach((link) => {
     const section = link.dataset.section;
     document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
     document.getElementById('view-' + section).classList.remove('hidden');
+    if (section === 'historique') loadHistory();
+    closeMobileMenu();
   });
 });
+
+// ---- Menu mobile (hamburger) ----
+const sidebar = document.getElementById('sidebar');
+const mobileOverlay = document.getElementById('mobileOverlay');
+const burgerBtn = document.getElementById('burgerBtn');
+
+function openMobileMenu() {
+  sidebar.classList.add('open');
+  mobileOverlay.classList.add('show');
+}
+function closeMobileMenu() {
+  sidebar.classList.remove('open');
+  mobileOverlay.classList.remove('show');
+}
+burgerBtn.addEventListener('click', () => {
+  if (sidebar.classList.contains('open')) closeMobileMenu();
+  else openMobileMenu();
+});
+mobileOverlay.addEventListener('click', closeMobileMenu);
+
+// ---- Spinner global ----
+const globalLoader = document.getElementById('globalLoader');
+function showLoader() { globalLoader.classList.remove('hidden'); }
+function hideLoader() { globalLoader.classList.add('hidden'); }
 
 // ---- Formulaire de compte rendu ----
 document.getElementById('reportForm').addEventListener('submit', async (e) => {
